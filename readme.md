@@ -19,11 +19,11 @@ to identify the user organizr v2 is needed
 
 # Commands
 
-sudo docker compose build                        //build
+sudo docker compose build -> build from Dockerfile
 
-sudo docker compose build --no-cache             //build clean
+sudo docker compose build --no-cache -> clean build from Dockerfile
 
-sudo docker compose up -d                        //run
+sudo docker compose up -d -> run docker-compose
 
 # Organizr Popup
 
@@ -32,7 +32,7 @@ For the Organizr V2 Widget just add the content of "customJS" in the Organizr V2
 
 # Troubleshoot API
 
-- healthcheck                               ->      /health
+/health -> healthcheck 
   
-- organizr membercheck (group, user, jwt)   ->      /api/v1/membership
+/api/v1/membership -> organizr membercheck (group, user, jwt) 
 
