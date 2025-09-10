@@ -1,0 +1,185 @@
+//Notification Abo
+(function () {
+  const DEBUG = /(?:[?&]reminderDebug=1)/.test(location.search);
+
+  function decodeJwtPayload(token) {
+    try {
+      const parts = token.split(".");
+      if (parts.length < 2) return null;
+      let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      while (b64.length % 4) b64 += "=";
+      const payload = atob(b64);
+      return JSON.parse(decodeURIComponent(escape(payload)));
+    } catch (e) {
+      console.warn("JWT decode failed:", e);
+      return null;
+    }
+  }
+
+  function daysLeftFromEpoch(epochSec) {
+    if (!epochSec) return null;
+    const now = Date.now();
+    const diffMs = epochSec * 1000 - now;
+    return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  }
+
+  function positionTopCenter(el) {
+    Object.assign(el.style, {
+      position: "fixed",
+      top: "15px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 99999,
+    });
+  }
+
+  function createStatusChip({ text, bg }) {
+    const chip = document.createElement("div");
+    chip.id = "reminder-status-chip";
+    chip.textContent = text;
+
+    positionTopCenter(chip);
+    Object.assign(chip.style, {
+      padding: "8px 12px",
+      borderRadius: "999px",
+      background: bg,
+      color: "#fff",
+      font: "14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+      boxShadow: "0 4px 12px rgba(0,0,0,.2)",
+      cursor: "default",
+    });
+
+    // Auto-hide after 15s
+    setTimeout(() => {
+      chip.style.transition = "opacity .4s ease";
+      chip.style.opacity = "0";
+      setTimeout(() => chip.remove(), 400);
+    }, 15000);
+
+    return chip;
+  }
+
+  function showAlert(username, daysLeft, expiryText) {
+    const note = document.createElement("div");
+    note.id = "reminder-alert";
+    const color =
+      daysLeft <= 3 ? "#dc3545" : daysLeft <= 7 ? "#ffc107" : "#17b82cff";
+
+    positionTopCenter(note);
+    Object.assign(note.style, {
+      minWidth: "280px",
+      maxWidth: "420px",
+      background: "#fff",
+      color: "#111",
+      borderLeft: `6px solid ${color}`,
+      borderRadius: "8px",
+      boxShadow: "0 8px 24px rgba(0,0,0,.2)",
+      padding: "12px 16px",
+      font: "14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+    });
+
+
+/*
+    note.innerHTML = `
+      <div style="font-weight:600;margin-bottom:6px;">Hallo ${username || "Mitglied"}</div>
+      <div>Deine Mitgliedschaft läuft in <b>${daysLeft} Tag${daysLeft === 1 ? "" : "en"}</b> ab.</div>
+      ${expiryText ? `<div style="opacity:.8;margin-top:4px;">Ablaufdatum: ${expiryText}</div>` : ""}
+      <button aria-label="Close" style="position:absolute;top:6px;right:8px;border:none;background:transparent;font-size:18px;line-height:1;cursor:pointer;">×</button>
+    `;
+*/
+ 
+    note.innerHTML = `
+      <div style="font-weight:600;margin-bottom:6px;">Hello ${username || "Member"}</div>
+      <div>Your membership will be lost in <b>${daysLeft} day${daysLeft === 1 ? "" : "s"}</b></div>
+      ${expiryText ? `<div style="opacity:.8;margin-top:4px;">Expiry date: ${expiryText}</div>` : ""}
+      <button aria-label="Close" style="position:absolute;top:6px;right:8px;border:none;background:transparent;font-size:18px;line-height:1;cursor:pointer;">×</button>
+    `;
+
+
+    note.querySelector("button").addEventListener("click", () => note.remove());
+    document.body.appendChild(note);
+
+    // Auto-hide nach 15s
+    setTimeout(() => {
+      note.style.transition = "opacity .4s ease";
+      note.style.opacity = "0";
+      setTimeout(() => note.remove(), 400);
+    }, 15000);
+  }
+
+  $(document).ready(function () {
+    const active = window.activeInfo?.user;
+    if (!active || !active.token) {
+      console.warn("❌ No user active – reminder didnt loaded at the moment.");
+      return;
+    }
+
+    const token = active.token;
+    const payload = decodeJwtPayload(token) || {};
+    const username = payload.username || active.username || payload.name || payload.sub || null;
+    const user_uuid = payload.organizr_user_uuid || payload.user_uuid || payload.uuid || null;
+
+    if (DEBUG) console.log("🔑 send to reminder:", { username, user_uuid });
+
+    /* EDIT THE URL TO YOUR SETUP! */
+    fetch("https://reminder.leiwandstreamen.com/api/v1/membership", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, user_uuid }),
+    })
+      .then((res) => {
+        if (DEBUG) console.log("HTTP", res.status);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then((data) => {
+        if (DEBUG) console.log("📡 Reminder API respond:", data);
+
+        // no subscription (admin or whatever)
+        if (Number(data.expiry_epoch) === 0) {
+          const chip = createStatusChip({
+            text: "Mitgliedschaft: ohne Ablaufdatum",
+            bg: "#195fa1ff",
+          });
+          document.body.appendChild(chip);
+          return;
+        }
+
+        let daysLeft = Number(data.days_left);
+        if (!Number.isFinite(daysLeft) && Number.isFinite(data.expiry_epoch)) {
+          daysLeft = daysLeftFromEpoch(Number(data.expiry_epoch));
+        }
+
+        const expiryText = data.expiry_date || (data.expiry_epoch ? new Date(data.expiry_epoch * 1000).toLocaleString() : "");
+
+        // Status-Chip (top center)
+        let bg = "#28a745";
+        if (Number.isFinite(daysLeft)) {
+          if (daysLeft <= 3) bg = "#dc3545";
+          else if (daysLeft <= 7) bg = "#ffc107";
+          else if (daysLeft <= 14) bg = "#17b82cff";
+        }
+        const chip = createStatusChip({
+          text: Number.isFinite(daysLeft)
+            ? `Subscription: ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`
+            : "Subscription: k.A.",
+          bg,
+        });
+        document.body.appendChild(chip);
+
+        // additional alert box if <= 14 days left
+        if (Number.isFinite(daysLeft) && daysLeft <= 14) {
+          showAlert(data.username || username, daysLeft, expiryText);
+        }
+      })
+      .catch((err) => {
+        console.error("Reminder API fetch failed:", err);
+        const chip = createStatusChip({ text: "JFA-Reminder: Error", bg: "#dc3545" });
+        document.body.appendChild(chip);
+      });
+  });
+})();

@@ -1,0 +1,21 @@
+services:
+  expiry-notifier:
+    container_name: expiry-notifier
+    build:
+      context: ./app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    environment:
+      - TZ=Europe/Berlin
+    env_file:
+      - ./app/.env
+    restart: always
+#    networks:
+#      dmzvlan:
+
+#networks:
+#  dmzvlan:
+#    external: true
