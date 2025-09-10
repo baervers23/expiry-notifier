@@ -1,28 +1,22 @@
 This tool dump the database generated from JFA GO and uses the collected information to display a popup notification with the expiry date for every organizr user if logged in
 
-![Beispiel](https://github.com/baervers23/expiry-notifier/blob/main/img/user.png)
-
-
-
 to identify the user organizr v2 is needed
 
-1 - Edit .env file
-2 - Edit docker-compose.yml file
-3 - Build and run with docker compose
+![Beispiel](https://github.com/baervers23/expiry-notifier/blob/main/img/user.png)
 
-//build
-sudo docker compose build
+Installation
+1 - git clone https://github.com/baervers23/expiry-notifier.git
+2 - Edit .env file
+3 - Edit docker-compose.yml file
+4 - Build (prefer clean/no-cache)
+5 - Run with docker compose
 
-//build clean 
-sudo docker compose build --no-cache
-
-//run
-sudo docker compose up -d
-
-
+Commands
+sudo docker compose build                        //build
+sudo docker compose build --no-cache             //build clean
+sudo docker compose up -d                        //run
 
 For the Organizr V2 Widget just add the content of "customJS" in the Organizr V2 CustomJavaScript section.
-
 
 # -------------------
 # Troubleshoot API
